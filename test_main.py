@@ -6,6 +6,8 @@ import json
 
 from main import revenue_to_records
 
+from main import select_recent_revenue
+
 from main import (
     calculate_revenue_growth,
     extract_msft_annual_revenue,
@@ -222,3 +224,47 @@ def test_revenue_to_records():
 
     # 转成 JSON 再读回来，内容应保持一致
     assert json.loads(json_text) == records
+
+def test_select_recent_revenue():
+    # 故意打乱顺序，检查是否按财年选择最新三年
+    report = {
+        "ticker": "AAPL",
+        "annual_revenue": [
+            {"fiscal_year": 2025, "growth_pct": 6.43},
+            {"fiscal_year": 2022, "growth_pct": 7.79},
+            {"fiscal_year": 2024, "growth_pct": 2.02},
+            {"fiscal_year": 2023, "growth_pct": -2.80},
+        ],
+    }
+
+    result = select_recent_revenue(report, years=3)
+
+    assert result["selected_fiscal_years"] == [2023, 2024, 2025]
+    assert result["requested_years"] == 3
+    assert result["returned_years"] == 3
+
+    # 筛选后第一年的同比仍保留
+    assert result["annual_revenue"][0]["growth_pct"] == -2.80
+
+    # 原报告没有被截断或重新排序
+    assert [
+        row["fiscal_year"] for row in report["annual_revenue"]
+    ] == [2025, 2022, 2024, 2023]
+
+
+def test_select_recent_revenue_with_insufficient_data():
+    report = {
+        "annual_revenue": [{"fiscal_year": 2025}],
+    }
+
+    result = select_recent_revenue(report, years=3)
+
+    assert result["requested_years"] == 3
+    assert result["returned_years"] == 1
+    assert result["selected_fiscal_years"] == [2025]
+
+
+@pytest.mark.parametrize("years", [0, -1, 11])
+def test_select_recent_revenue_rejects_invalid_years(years):
+    with pytest.raises(ValueError, match="years 必须"):
+        select_recent_revenue({"annual_revenue": []}, years)
