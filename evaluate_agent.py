@@ -33,7 +33,7 @@ async def evaluate_case(case: dict) -> dict:
                         item.raw_item.arguments
                     ),
                 })
-            elif item.type == "tool_output_item":
+            elif item.type == "tool_call_output_item":
                 tool_outputs.append({
                     "output": item.output,
                 })  
