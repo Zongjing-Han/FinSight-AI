@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import argparse
 from pathlib import Path
+import json
 
 COMPANY_CONFIGS = {
     "MSFT": {
@@ -141,7 +142,32 @@ def extract_annual_revenue(
 
     return result
 
+def revenue_to_records(
+    revenue_df: pd.DataFrame,
+) -> list[dict]:
+    """把年度收入表转为可用于 JSON 的记录列表。"""
+    columns = [
+        "fiscal_year",
+        "val",
+        "revenue_growth_pct",
+        "source_url",
+    ]
 
+    records = []
+
+    for row in revenue_df[columns].to_dict(orient="records"):
+        records.append({
+            "fiscal_year": int(row["fiscal_year"]),
+            "revenue": int(row["val"]),
+            "growth_pct": (
+                None
+                if pd.isna(row["revenue_growth_pct"])
+                else float(row["revenue_growth_pct"])
+            ),
+            "source_url": row["source_url"],
+        })
+
+    return records
 
 
 def main():
@@ -263,6 +289,30 @@ def main():
     )
 
     print(f"\n结果已保存至：{output_path}")
+
+    report = {
+        "ticker": ticker,
+        "company_name": data["entityName"],
+        "cik": str(data["cik"]).zfill(10),
+        "unit": "USD",
+        "revenue_tag": config["revenue_tag"],
+        "disclosure_policy": "latest_filed",
+        "annual_revenue": revenue_to_records(annual_df),
+    }
+
+    json_path = output_dir / f"{ticker.lower()}_annual_revenue.json"
+
+    json_path.write_text(
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            indent=2,
+            allow_nan=False,
+        ),
+        encoding="utf-8",
+    )
+
+    print(f"JSON 结果已保存至：{json_path}")    
 
 
 if __name__ == "__main__":

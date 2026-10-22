@@ -2,6 +2,9 @@ import pandas as pd
 import pytest
 import main
 import requests
+import json
+
+from main import revenue_to_records
 
 from main import (
     calculate_revenue_growth,
@@ -192,3 +195,30 @@ def test_main_handles_http_403(monkeypatch, capsys):
 
     assert error.value.code == 1
     assert "SEC 返回 HTTP 403" in capsys.readouterr().err
+
+def test_revenue_to_records():
+    source = pd.DataFrame({
+        "fiscal_year": [2023, 2024],
+        "val": [100, 120],
+        "revenue_growth_pct": [float("nan"), 20.0],
+        "source_url": [
+            "https://example.com/2023",
+            "https://example.com/2024",
+        ],
+    })
+
+    records = revenue_to_records(source)
+
+    assert records[0] == {
+        "fiscal_year": 2023,
+        "revenue": 100,
+        "growth_pct": None,
+        "source_url": "https://example.com/2023",
+    }
+    assert records[1]["growth_pct"] == pytest.approx(20.0)
+
+    # 严格转换：如果还存在 NaN 等非标准值，立即报错
+    json_text = json.dumps(records, allow_nan=False)
+
+    # 转成 JSON 再读回来，内容应保持一致
+    assert json.loads(json_text) == records
