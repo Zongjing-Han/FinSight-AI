@@ -1,0 +1,14 @@
+# 本地 Python 环境
+.venv/
+
+# Python 和 pytest 缓存
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# 本地配置
+.env
+.env.*
+
+# 生成的数据
+data/
