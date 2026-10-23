@@ -45,13 +45,21 @@ def main():
         default="MSFT",
         help="公司股票代码，默认MSFT",
     )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="忽略本地缓存，从 SEC 重新获取数据",
+    )
     args = parser.parse_args()
 
     ticker = args.ticker
     config = COMPANY_CONFIGS[ticker]
 
     try:
-        data = fetch_company_facts(config["cik"])
+        data = fetch_company_facts(
+            config["cik"],
+            refresh=args.refresh,
+        )
     except requests.exceptions.Timeout:
         parser.exit(
             status=1,

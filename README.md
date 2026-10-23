@@ -70,6 +70,17 @@ python -m pytest -q
 本轮共使用 3,111 tokens，平均端到端耗时约 3.53 秒。
 结果仅代表本次小样本评估，不代表总体准确率。
 
+## SEC 数据缓存
+
+Company Facts 原始数据缓存在 `data/cache/`，有效期为一小时。
+缓存过期或损坏时重新获取，不自动回退使用过期数据。
+
+强制刷新：
+
+```cmd
+python main.py --ticker MSFT --refresh
+```cmd
+
 ## 数据来源
 
 [SEC Company Facts API](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)

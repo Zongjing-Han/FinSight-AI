@@ -161,7 +161,7 @@ def test_extract_annual_revenue_for_different_calendars(
     assert result.iloc[0]["fiscal_year"] == pd.Timestamp(end).year
 
 def test_main_handles_timeout(monkeypatch, capsys):
-    def fake_fetch(cik):
+    def fake_fetch(cik, *, refresh=False):
         raise requests.exceptions.Timeout("模拟超时")
 
     # 用模拟函数替换真实请求，并设置命令行参数
@@ -180,7 +180,7 @@ def test_main_handles_timeout(monkeypatch, capsys):
     assert "请求 SEC 超时" in captured.err
 
 def test_main_handles_http_403(monkeypatch, capsys):
-    def fake_fetch(cik):
+    def fake_fetch(cik, *, refresh=False):
         response = requests.Response()
         response.status_code = 403
         raise requests.exceptions.HTTPError(
