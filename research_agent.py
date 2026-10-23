@@ -2,11 +2,11 @@ import asyncio
 import os
 import json
 
-from main import (
+from revenue_service import (
     get_company_revenue,
     select_recent_revenue,
-    render_revenue_table,
 )
+from reporting import render_revenue_table
 
 from agents import Agent, Runner, function_tool
 
