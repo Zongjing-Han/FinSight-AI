@@ -73,3 +73,5 @@ def test_evaluate_case_records_tool_output(monkeypatch):
 
     # 确认评估记录能保存为标准 JSON
     json.dumps(report, allow_nan=False)
+
+    assert report["displayed_answer"] == "模拟回答"

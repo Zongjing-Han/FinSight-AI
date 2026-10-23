@@ -8,6 +8,8 @@ from main import revenue_to_records
 
 from main import select_recent_revenue
 
+from main import render_revenue_table
+
 from main import (
     calculate_revenue_growth,
     extract_msft_annual_revenue,
@@ -268,3 +270,46 @@ def test_select_recent_revenue_with_insufficient_data():
 def test_select_recent_revenue_rejects_invalid_years(years):
     with pytest.raises(ValueError, match="years 必须"):
         select_recent_revenue({"annual_revenue": []}, years)
+
+def test_render_revenue_table():
+    report = {
+        "ticker": "TEST",
+        "requested_years": 3,
+        "returned_years": 2,
+        "annual_revenue": [
+            {
+                "fiscal_year": 2024,
+                "revenue": 12_345_000_000,
+                "growth_pct": -2.345,
+                "source_url": "https://example.com/2024",
+            },
+            {
+                "fiscal_year": 2023,
+                "revenue": 10_000_000_000,
+                "growth_pct": None,
+                "source_url": "https://example.com/2023",
+            },
+        ],
+    }
+
+    table = render_revenue_table(report)
+
+    # 金额统一换算为亿美元；缺失同比不写成零
+    assert "| 2023 | 100.00 | 无法计算 |" in table
+    assert "| 2024 | 123.45 | -2.35 |" in table
+
+    # 即使输入乱序，输出也按财年排列
+    assert table.index("| 2023 |") < table.index("| 2024 |")
+
+    # 来源必须保留对应关系
+    assert (
+        "[2024财年收入来源](https://example.com/2024)"
+        in table
+    )
+
+    # 数据不足时，明确范围限制
+    assert "请求 3 个财年，当前工具返回 2 个" in table
+    assert "不代表公司没有更早的财报" in table
+
+    assert "营业收入（亿美元）" in table
+

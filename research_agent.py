@@ -1,5 +1,12 @@
 import asyncio
 import os
+import json
+
+from main import (
+    get_company_revenue,
+    select_recent_revenue,
+    render_revenue_table,
+)
 
 from agents import Agent, Runner, function_tool
 
@@ -7,7 +14,7 @@ from main import get_company_revenue, select_recent_revenue
 
 
 @function_tool
-def fetch_annual_revenue(ticker: str, years: int = 3) -> dict:
+def fetch_annual_revenue(ticker: str, years: int = 3) -> str:
     """获取公司最近 N 个已披露完整财年的收入、同比和来源。
 
     Args:
@@ -27,30 +34,64 @@ def fetch_annual_revenue(ticker: str, years: int = 3) -> dict:
         f"{result['selected_fiscal_years']}"
     )
 
-    return result
+    result["rendered_table"] = render_revenue_table(result)
+
+    return json.dumps(
+        result,
+        ensure_ascii=False,
+        allow_nan=False,
+    )
 
 research_agent = Agent(
     name="Financial Research Assistant",
     model="gpt-4.1-mini",
     instructions=(
         "你是金融数据研究助手，使用中文回答。"
-        "回答公司营业收入相关问题前，必须调用收入工具。"
-        "只使用工具返回的财务数字，不编造数据。"
-        "明确注明财年、金额单位和同比增长率。"
-        "缺失同比应说明无法计算，不得当作零。"
-        "附上对应的来源链接，并说明链接指向申报目录。"
-        "当前只支持 MSFT 和 AAPL；其他公司应说明暂不支持。"
-        "当前工具只提供收入数据，不据此推断收入变化的原因。"
-        "用户要求最近 N 年时，将 N 作为 years 参数调用收入工具。"
-        "以工具返回的 selected_fiscal_years 为准，不根据自身知识判断最新年份。"
-        "展示所有返回的年度记录；若 returned_years 少于 requested_years，说明数据不足。"
-        "同一公司同一次查询通常只需调用一次；失败时不得无休止重试。"
-        "工具金额单位为 USD；展示时除以 100000000，转换为亿美元。"
-        "表头和正文必须统一注明亿美元，不得把换算后的数字标为美元。"
-        "单元格只填写数字；同比增长率（%）保留两位小数。"
+
+        "当前仅支持 MSFT 和 AAPL 的年度营业收入查询。"
+        "对于无关问题或不支持的公司，简短说明支持范围，不调用收入工具。"
+
+        "查询已支持公司的收入时，先调用收入工具。"
+        "用户要求最近 N 年时，将 N 作为 years 参数；"
+        "未指定年数时默认查询三年。"
+        "years 只支持 1 到 10；超出范围时说明限制，请用户调整。"
+        "同一公司同一次查询通常只需调用一次，失败后不要重复尝试。"
+
+        "工具返回的 rendered_table 由程序直接展示，"
+        "你不要重复生成表格、换算金额或抄写数字及来源链接。"
+        "最终回答只提供简短说明。"
+
+        "只依据工具结果回答，不使用自身知识补充财务事实。"
+        "数据不足仅代表当前工具及收入标签的覆盖范围，"
+        "不代表公司没有更早的财报。"
+        "当前工具没有收入变化原因的证据，不推断增长或下降原因。"
+        "工具失败时如实说明未能获取数据，不编造结果。"
     ),
     tools=[fetch_annual_revenue],
 )
+
+def format_research_result(result) -> str:
+    """有工具表格时展示表格，否则展示模型回答。"""
+    tables = []
+
+    for item in result.new_items:
+        if item.type != "tool_call_output_item":
+            continue
+
+        try:
+            payload = json.loads(item.output)
+        except (TypeError, json.JSONDecodeError):
+            continue
+
+        if isinstance(payload, dict):
+            table = payload.get("rendered_table")
+            if isinstance(table, str) and table.strip():
+                tables.append(table)
+
+    if tables:
+        return "\n\n".join(tables)
+
+    return str(result.final_output)
 
 async def main():
     for variable in ["OPENAI_API_KEY", "SEC_USER_AGENT"]:
@@ -76,8 +117,8 @@ async def main():
             print("  工具：", item.raw_item.name)
             print("  参数：", item.raw_item.arguments)
 
-    print("\n最终回答：")
-    print(result.final_output)
+    print("\n研究结果：")
+    print(format_research_result(result))
 
 if __name__ == "__main__":
     asyncio.run(main())

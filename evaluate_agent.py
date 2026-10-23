@@ -7,7 +7,10 @@ from pathlib import Path
 
 from agents import Runner
 
-from research_agent import research_agent
+from research_agent import (
+    research_agent,
+    format_research_result,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -65,6 +68,7 @@ async def evaluate_case(case: dict) -> dict:
             "tool_calls": calls,
             "tool_outputs": tool_outputs,
             "answer": result.final_output,
+            "displayed_answer": format_research_result(result),
             "elapsed_seconds": round(
                 time.perf_counter() - started, 3
             ),
