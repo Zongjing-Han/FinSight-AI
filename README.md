@@ -79,15 +79,15 @@ Company Facts 原始数据缓存在 `data/cache/`，有效期为一小时。
 
 ```cmd
 python main.py --ticker MSFT --refresh
-
+```
 
 ## Web Dashboard
 
-在已配置 SEC_USER_AGENT 的终端运行：
+在已配置 `SEC_USER_AGENT` 的终端运行：
 
 ```cmd
 python -m streamlit run dashboard.py
-
+```
 
 支持选择公司、查询年数、查看收入表、SEC 来源及收入趋势图。
 查询结果保留在当前页面会话中。此页面暂不调用大模型。
