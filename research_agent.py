@@ -10,8 +10,6 @@ from reporting import render_revenue_table
 
 from agents import Agent, Runner, function_tool
 
-from main import get_company_revenue, select_recent_revenue
-
 
 @function_tool
 def fetch_annual_revenue(ticker: str, years: int = 3) -> str:
@@ -93,21 +91,29 @@ def format_research_result(result) -> str:
 
     return str(result.final_output)
 
-async def main():
+async def run_research(question: str):
+    """执行一次研究任务，返回完整运行结果。"""
+    question = question.strip()
+    if not question:
+        raise ValueError("问题不能为空")
+
     for variable in ["OPENAI_API_KEY", "SEC_USER_AGENT"]:
         if not os.getenv(variable):
             raise ValueError(f"请先设置 {variable}")
 
+    return await Runner.run(
+        research_agent,
+        question,
+        max_turns=3,
+    )
+
+async def main():
     question = input("请输入研究问题：").strip()
     if not question:
         print("问题不能为空。")
         return
 
-    result = await Runner.run(
-        research_agent,
-        question,
-        max_turns=3,
-    )
+    result = await run_research(question)
 
     print("\n执行记录：")
     for item in result.new_items:

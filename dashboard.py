@@ -1,6 +1,12 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import asyncio
+
+from research_agent import (
+    run_research,
+    format_research_result,
+)
 
 from config import COMPANY_CONFIGS
 from reporting import render_revenue_table
@@ -103,3 +109,51 @@ if report is not None:
     )
 
     st.altair_chart(chart, use_container_width=True)
+
+
+st.divider()
+st.header("Agent 自然语言查询")
+st.caption(
+    "目前支持 MSFT、AAPL 的年度营业收入查询。"
+    "提交会调用 OpenAI API 并产生费用；普通收入查询不调用模型。"
+)
+
+if "agent_response" not in st.session_state:
+    st.session_state["agent_response"] = None
+
+with st.form("research_question_form"):
+    question = st.text_input(
+        "研究问题",
+        placeholder="例如：查询苹果最近三个完整财年的收入和同比。",
+    )
+    submitted = st.form_submit_button("提交给 Agent")
+
+if submitted:
+    if not question.strip():
+        st.warning("请输入研究问题。")
+    else:
+        try:
+            with st.spinner("Agent 正在查询……"):
+                result = asyncio.run(
+                    run_research(question)
+                )
+
+            st.session_state["agent_response"] = {
+                "question": question.strip(),
+                "answer": format_research_result(result),
+            }
+
+        except Exception:
+            st.error(
+                "Agent 查询失败，请查看终端错误详情。"
+                "上次成功结果将保留。"
+            )
+            import traceback
+            traceback.print_exc()
+
+response = st.session_state["agent_response"]
+
+if response is not None:
+    st.subheader("上次成功的 Agent 查询")
+    st.caption(f"问题：{response['question']}")
+    st.markdown(response["answer"])

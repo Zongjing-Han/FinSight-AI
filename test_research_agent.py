@@ -1,5 +1,9 @@
 import json
+import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import research_agent
 
 from research_agent import format_research_result
 
@@ -27,3 +31,20 @@ def test_answer_is_shown_without_table():
     )
 
     assert format_research_result(result) == result.final_output
+
+
+def test_run_research_delegates_to_runner(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("SEC_USER_AGENT", "Test test@example.com")
+    expected = SimpleNamespace(final_output="模拟结果")
+    fake_run = AsyncMock(return_value=expected)
+    monkeypatch.setattr(research_agent.Runner, "run", fake_run)
+
+    result = asyncio.run(research_agent.run_research("  查询微软收入  "))
+
+    assert result is expected
+    fake_run.assert_awaited_once_with(
+        research_agent.research_agent,
+        "查询微软收入",
+        max_turns=3,
+    )
