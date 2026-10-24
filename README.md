@@ -79,7 +79,7 @@ Company Facts 原始数据缓存在 `data/cache/`，有效期为一小时。
 
 ```cmd
 python main.py --ticker MSFT --refresh
-```cmd
+
 
 ## Web Dashboard
 
@@ -87,7 +87,7 @@ python main.py --ticker MSFT --refresh
 
 ```cmd
 python -m streamlit run dashboard.py
-```
+
 
 支持选择公司、查询年数、查看收入表、SEC 来源及收入趋势图。
 查询结果保留在当前页面会话中。此页面暂不调用大模型。
