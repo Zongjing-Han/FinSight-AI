@@ -49,3 +49,57 @@ def render_revenue_table(report: dict) -> str:
         ])
 
     return "\n".join(lines)
+
+def render_profitability_table(report: dict) -> str:
+    """展示盈利能力，金额单位为亿美元。"""
+    lines = [
+        f"### {report['ticker']} 年度盈利能力",
+        "",
+        "| 财年 | 营业收入（亿美元） | 归母净利润（亿美元） | 净利率（%） | 收入来源 | 净利润来源 |",
+        "|---|---:|---:|---:|---|---|",
+    ]
+
+    records = sorted(
+        report["annual_profitability"],
+        key=lambda row: (row["end"], row["start"]),
+    )
+
+    for row in records:
+        year = row["fiscal_year"]
+        revenue = row["revenue"] / 100_000_000
+
+        net_income = (
+            "N/A"
+            if row["net_income"] is None
+            else f"{row['net_income'] / 100_000_000:.2f}"
+        )
+        margin = (
+            "无法计算"
+            if row["net_margin_pct"] is None
+            else f"{row['net_margin_pct']:.2f}"
+        )
+
+        revenue_source = (
+            f"[来源]({row['revenue_source_url']})"
+            if row["revenue_source_url"]
+            else "缺失"
+        )
+        profit_source = (
+            f"[来源]({row['net_income_source_url']})"
+            if row["net_income_source_url"]
+            else "缺失"
+        )
+
+        lines.append(
+            f"| {year} | {revenue:.2f} | {net_income} | "
+            f"{margin} | {revenue_source} | {profit_source} |"
+        )
+
+    lines.extend([
+        "",
+        "净利率口径：归属于母公司的税后净利润 ÷ 营业收入 × 100%。",
+        "各指标分别采用最新披露值；来源链接指向 SEC 申报目录。",
+        "N/A 表示数据缺失，不代表零。",
+    ])
+
+    return "\n".join(lines)

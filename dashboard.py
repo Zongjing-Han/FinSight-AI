@@ -8,10 +8,16 @@ from research_agent import (
     format_research_result,
 )
 
+from reporting import (
+    render_revenue_table,
+    render_profitability_table,
+)
+
 from config import COMPANY_CONFIGS
-from reporting import render_revenue_table
+
 from revenue_service import (
     get_company_revenue,
+    get_company_profitability,
     select_recent_revenue,
 )
 
@@ -22,7 +28,7 @@ st.set_page_config(
 )
 
 st.title("FinSight AI")
-st.caption("基于 SEC 申报数据的年度营业收入研究")
+st.caption("基于 SEC 申报数据的收入增长与盈利能力研究")
 
 ticker = st.selectbox(
     "选择公司",
@@ -39,7 +45,10 @@ years = st.slider(
 if "revenue_report" not in st.session_state:
     st.session_state["revenue_report"] = None
 
-if st.button("查询收入", type="primary"):
+if "profitability_report" not in st.session_state:
+    st.session_state["profitability_report"] = None
+
+if st.button("查询财务数据", type="primary"):
     try:
         with st.spinner("正在获取和处理财务数据……"):
             report = select_recent_revenue(
@@ -47,8 +56,20 @@ if st.button("查询收入", type="primary"):
                 years,
             )
 
-        # 只有查询成功才替换已有结果
+            profitability = get_company_profitability(ticker)
+
+            # 与收入表展示相同的财年
+            selected_years = set(report["selected_fiscal_years"])
+
+            profitability["annual_profitability"] = [
+                row
+                for row in profitability["annual_profitability"]
+                if row["fiscal_year"] in selected_years
+            ]
+
+        # 两份结果都准备成功后，再一起更新页面状态
         st.session_state["revenue_report"] = report
+        st.session_state["profitability_report"] = profitability
 
     except Exception:
         st.error(
@@ -58,7 +79,7 @@ if st.button("查询收入", type="primary"):
         import traceback
         traceback.print_exc()
 
-# 展示逻辑放在按钮判断外，重新执行脚本时仍能显示
+# 每次页面重新执行，都读取上次成功的查询结果。
 report = st.session_state["revenue_report"]
 
 if report is not None:
@@ -70,7 +91,7 @@ if report is not None:
             f"当前展示的是上次查询结果："
             f"{report['ticker']}，"
             f"请求 {report['requested_years']} 个财年。"
-            "点击“查询收入”更新。"
+            "点击“查询财务数据”更新。"
         )
 
     st.subheader(report["company_name"])
@@ -109,13 +130,21 @@ if report is not None:
     )
 
     st.altair_chart(chart, use_container_width=True)
+    profitability = st.session_state["profitability_report"]
+
+    if profitability is not None:
+        st.markdown(
+            render_profitability_table(profitability)
+        )
+    else:
+        st.info("请重新查询，以加载盈利能力数据。")
 
 
 st.divider()
 st.header("Agent 自然语言查询")
 st.caption(
-    "目前支持 MSFT、AAPL 的年度营业收入查询。"
-    "提交会调用 OpenAI API 并产生费用；普通收入查询不调用模型。"
+    "支持 MSFT、AAPL 的年度营收、收入同比、归母净利润和净利率查询。"
+    "提交会调用 OpenAI API 并产生费用；普通财务查询不调用模型。"
 )
 
 if "agent_response" not in st.session_state:

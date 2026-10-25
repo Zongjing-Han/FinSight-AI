@@ -1,11 +1,22 @@
 import asyncio
 import json
 from types import SimpleNamespace
+import pytest
 
 import evaluate_agent
 
 
-def test_evaluate_case_records_tool_output(monkeypatch):
+@pytest.mark.parametrize(
+    "actual_tool,expected_tool,passed",
+    [
+        ("fetch_annual_revenue", None, True),
+        ("fetch_profitability", "fetch_profitability", True),
+        ("fetch_annual_revenue", "fetch_profitability", False),
+    ],
+)
+def test_evaluate_case_records_tool_output(
+    monkeypatch, actual_tool, expected_tool, passed
+):
     tool_output = {
         "ticker": "AAPL",
         "selected_fiscal_years": [2023, 2024, 2025],
@@ -17,7 +28,7 @@ def test_evaluate_case_records_tool_output(monkeypatch):
                 SimpleNamespace(
                     type="tool_call_item",
                     raw_item=SimpleNamespace(
-                        name="fetch_annual_revenue",
+                        name=actual_tool,
                         arguments=json.dumps({
                             "ticker": "AAPL",
                             "years": 3,
@@ -55,14 +66,17 @@ def test_evaluate_case_records_tool_output(monkeypatch):
         "expected_years": 3,
     }
 
+    if expected_tool is not None:
+        case["expected_tool"] = expected_tool
+
     report = asyncio.run(
         evaluate_agent.evaluate_case(case)
     )
 
     assert report["status"] == "completed"
-    assert report["routing_passed"] is True
+    assert report["routing_passed"] is passed
     assert report["tool_calls"] == [{
-        "name": "fetch_annual_revenue",
+        "name": actual_tool,
         "arguments": {"ticker": "AAPL", "years": 3},
     }]
     assert report["tool_outputs"] == [{

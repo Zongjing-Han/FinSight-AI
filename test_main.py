@@ -18,6 +18,10 @@ from main import (
 
 from main import extract_annual_revenue
 
+from financial_data import extract_annual_metric
+
+from financial_data import calculate_net_margin
+
 def test_revenue_growth():
     # 故意打乱年份，检查函数是否正确排序
     source = pd.DataFrame({
@@ -313,3 +317,96 @@ def test_render_revenue_table():
 
     assert "营业收入（亿美元）" in table
 
+def test_extract_annual_net_loss():
+    facts = {
+        "facts": {
+            "us-gaap": {
+                "NetIncomeLoss": {
+                    "units": {
+                        "USD": [
+                            {
+                                "start": "2023-07-01",
+                                "end": "2024-06-30",
+                                "val": -20,
+                                "form": "10-K",
+                                "filed": "2024-07-30",
+                                "accn": "annual-loss",
+                            },
+                            {
+                                "start": "2024-01-01",
+                                "end": "2024-03-31",
+                                "val": -5,
+                                "form": "10-K",
+                                "filed": "2024-07-30",
+                                "accn": "quarter-loss",
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    result = extract_annual_metric(
+        facts,
+        tag="NetIncomeLoss",
+        fiscal_end_month=6,
+    )
+
+    assert len(result) == 1
+    assert result.iloc[0]["val"] == -20
+    assert result.iloc[0]["fiscal_year"] == 2024
+    assert result.iloc[0]["metric_tag"] == "NetIncomeLoss"
+
+
+def test_net_margin_matches_exact_periods():
+    revenue = pd.DataFrame({
+        "start": pd.to_datetime(["2023-07-01", "2022-07-01"]),
+        "end": pd.to_datetime(["2024-06-30", "2023-06-30"]),
+        "val": [100, 80],
+        "filed": pd.to_datetime(["2024-07-30", "2023-07-27"]),
+        "accn": ["revenue-2024", "revenue-2023"],
+    })
+
+    net_income = pd.DataFrame({
+        "start": pd.to_datetime(["2022-07-01", "2023-07-02"]),
+        "end": pd.to_datetime(["2023-06-30", "2024-06-30"]),
+        "val": [-20, 30],
+        "filed": pd.to_datetime(["2023-07-27", "2024-07-30"]),
+        "accn": ["profit-2023", "different-period"],
+    })
+
+    result = calculate_net_margin(revenue, net_income)
+
+    matched = result[result["period_match"] == "both"]
+    assert len(matched) == 1
+    assert matched.iloc[0]["fiscal_year"] == 2023
+    assert matched.iloc[0]["net_margin_pct"] == pytest.approx(-25.0)
+    assert matched.iloc[0]["revenue_accn"] == "revenue-2023"
+    assert matched.iloc[0]["net_income_accn"] == "profit-2023"
+
+    unmatched = result[result["period_match"] != "both"]
+    assert len(unmatched) == 2
+    assert unmatched["net_margin_pct"].isna().all()
+
+def test_net_margin_with_zero_revenue():
+    period = {
+        "start": pd.to_datetime(["2023-07-01"]),
+        "end": pd.to_datetime(["2024-06-30"]),
+        "filed": pd.to_datetime(["2024-07-30"]),
+        "accn": ["same-filing"],
+    }
+
+    revenue = pd.DataFrame({
+        **period,
+        "val": [0],
+    })
+    net_income = pd.DataFrame({
+        **period,
+        "val": [-20],
+    })
+
+    result = calculate_net_margin(revenue, net_income)
+
+    assert result.iloc[0]["period_match"] == "both"
+    assert pd.isna(result.iloc[0]["net_margin_pct"])

@@ -24,10 +24,18 @@
     "expected_tool_calls": 0
   },
   {
-  "id": "aapl_insufficient_history",
-  "question": "查询苹果最近十个完整财年的收入和同比；不足十年就列出已有数据，并说明缺少几年。",
-  "expected_tool_calls": 1,
-  "expected_ticker": "AAPL",
-  "expected_years": 10
+    "id": "aapl_insufficient_history",
+    "question": "查询苹果最近十个完整财年的收入和同比；不足十年就列出已有数据，并说明缺少几年。",
+    "expected_tool_calls": 1,
+    "expected_ticker": "AAPL",
+    "expected_years": 10
+  },
+  {
+    "id": "aapl_profitability_3",
+    "question": "查询苹果最近三个完整财年的净利润和净利率。",
+    "expected_tool_calls": 1,
+    "expected_tool": "fetch_profitability",
+    "expected_ticker": "AAPL",
+    "expected_years": 3
   }
 ]

@@ -1,21 +1,21 @@
 import pandas as pd
 
 
-def extract_annual_revenue(
+def extract_annual_metric(
     facts: dict,
-    revenue_tag: str,
+    tag: str,
     fiscal_end_month: int,
 ) -> pd.DataFrame:
-    """提取常规完整财年的收入，适用于当前验证的公司。"""
+    """提取常规完整财年的美元指标，按最新披露口径去重。"""
 
     financial_facts = facts["facts"]["us-gaap"]
 
-    if revenue_tag not in financial_facts:
-        raise ValueError(f"公司数据中不存在收入标签：{revenue_tag}")
+    if tag not in financial_facts:
+        raise ValueError(f"公司数据中不存在指标标签：{tag}")
 
-    records = financial_facts[revenue_tag].get("units", {}).get("USD", [])
+    records = financial_facts[tag].get("units", {}).get("USD", [])
     if not records:
-        raise ValueError("该收入标签没有美元记录")
+        raise ValueError("该指标标签没有美元记录")
 
     df = pd.DataFrame(records)
 
@@ -51,12 +51,28 @@ def extract_annual_revenue(
     )
 
     if result.empty:
-        raise ValueError("没有找到符合筛选条件的年度收入")
+        raise ValueError("没有找到符合筛选条件的年度指标")
 
     result["fiscal_year"] = result["end"].dt.year
-    result["revenue_tag"] = revenue_tag
+    result["metric_tag"] = tag
 
     return result
+
+def extract_annual_revenue(
+    facts: dict,
+    revenue_tag: str,
+    fiscal_end_month: int,
+) -> pd.DataFrame:
+    """提取年度营业收入，保留原有接口和字段。"""
+    result = extract_annual_metric(
+        facts,
+        tag=revenue_tag,
+        fiscal_end_month=fiscal_end_month,
+    )
+
+    return result.rename(
+        columns={"metric_tag": "revenue_tag"}
+    )
 
 def revenue_to_records(
     revenue_df: pd.DataFrame,
@@ -114,5 +130,50 @@ def calculate_revenue_growth(
     result["revenue_usd_billions"] = (
         result["val"] / 1_000_000_000
     )
+
+    return result
+
+def calculate_net_margin(
+    revenue_df: pd.DataFrame,
+    net_income_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """按完整会计期间对齐，计算归母净利润口径的净利率。"""
+    columns = ["start", "end", "val", "filed", "accn"]
+
+    revenue = revenue_df[columns].rename(columns={
+        "val": "revenue",
+        "filed": "revenue_filed",
+        "accn": "revenue_accn",
+    })
+
+    net_income = net_income_df[columns].rename(columns={
+        "val": "net_income",
+        "filed": "net_income_filed",
+        "accn": "net_income_accn",
+    })
+
+    result = revenue.merge(
+        net_income,
+        on=["start", "end"],
+        how="outer",
+        validate="one_to_one",
+        indicator="period_match",
+    )
+
+    result = result.sort_values(
+        ["end", "start"]
+    ).reset_index(drop=True)
+
+    result["fiscal_year"] = result["end"].dt.year
+
+    can_calculate = (
+        result["revenue"].notna()
+        & (result["revenue"] > 0)
+        & result["net_income"].notna()
+    )
+
+    result["net_margin_pct"] = (
+        result["net_income"] / result["revenue"] * 100
+    ).where(can_calculate)
 
     return result

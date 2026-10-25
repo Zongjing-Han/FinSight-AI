@@ -50,7 +50,9 @@ async def evaluate_case(case: dict) -> dict:
         if "expected_ticker" in case:
             checks["tool_and_arguments"] = (
                 len(calls) == 1
-                and calls[0]["name"] == "fetch_annual_revenue"
+                and calls[0]["name"] == case.get(
+                    "expected_tool", "fetch_annual_revenue"
+                )
                 and calls[0]["arguments"].get("ticker")
                 == case["expected_ticker"]
                 and calls[0]["arguments"].get("years")
